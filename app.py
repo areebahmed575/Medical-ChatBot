@@ -9,6 +9,16 @@ from langchain_community.llms import OpenAI
 from langchain_community.vectorstores import Chroma
 from langchain_openai import OpenAI
 from src.helper import load_pdf, text_split
+from store_index import vectordb
+from src.helper import load_pdf, text_split
+import os
+from langchain_community.llms import OpenAI
+from langchain_community.vectorstores import Chroma
+# from fastapi import FastAPI, Request
+# from fastapi.responses import HTMLResponse
+# from fastapi.templating import Jinja2Templates
+# import uvicorn
+
 
 app = Flask(__name__)
 
@@ -16,6 +26,8 @@ load_dotenv()
 
 
 os.environ["OPENAI_API_KEY"]=""
+
+
 
 embedding=OpenAIEmbeddings()
 
@@ -30,18 +42,41 @@ vectordb = None
 vectordb = Chroma(persist_directory=persist_directory,embedding_function=embedding)
 
 PROMPT=PromptTemplate(template=prompt_template, input_variables=["context", "question"])
-
-retriever = vectordb.as_retriever(search_kwargs={"k": 2})
 chain_type_kwargs={"prompt": PROMPT}
 
 
+retriever = vectordb.as_retriever(search_kwargs={"k": 2})
 
 
-# create the chain to answer questions
+
+
+
+llm=OpenAI()
+
 qa_chain = RetrievalQA.from_chain_type(llm=OpenAI(),
                                   chain_type="stuff",
                                   retriever=retriever,
                                   return_source_documents=True)
+
+
+## Cite sources
+def process_llm_response(llm_response):
+    print(llm_response['result'])
+    print('\n\nSources:')
+    for source in llm_response["source_documents"]:
+        print(source.metadata['source'])
+
+# full example
+query = "What are Allergies?"
+
+
+llm_response = qa_chain.invoke(query)
+
+
+print(llm_response)
+
+print(process_llm_response(llm_response))
+
 
 
 
@@ -56,7 +91,7 @@ def chat():
     msg = request.form["msg"]
     input = msg
     print(input)
-    result=qa_chain({"query": input})
+    result=qa({"query": input})
     print("Response : ", result["result"])
     return str(result["result"])
 
